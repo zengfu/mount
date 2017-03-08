@@ -60,10 +60,10 @@ void LedSet(uint8_t num,uint8_t state)
 }
 /***************
 x:0,1,2,3
-0:1.88
+0:2.13
 1:1.96
 2:1.96
-3:2.13
+3:1.88
 
 ***************/
 void PirLevelSet(uint8_t x)
@@ -78,7 +78,7 @@ void PirLevelSet(uint8_t x)
 static void LteInit()
 {
   HAL_GPIO_WritePin(LTE_CLOSE_PORT,LTE_CLOSE,GPIO_PIN_RESET);//close
-  HAL_GPIO_WritePin(LTE_WAKEUP_PORT,LTE_WAKEUP,GPIO_PIN_RESET);//AUTO SLEEP
+  HAL_GPIO_WritePin(LTE_WAKEUP_PORT,LTE_WAKEUP_PIN,GPIO_PIN_RESET);//AUTO SLEEP
   HAL_GPIO_WritePin(LTE_RESET_PORT,LTE_RESET,GPIO_PIN_SET);//NO RESET
 }
 void LteOpen()

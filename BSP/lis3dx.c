@@ -63,7 +63,7 @@ uint8_t Lis3dxInit()
 //  Lis3dx.scale=SCALE_2G;
 //  Lis3dx.ths=0x05;
   Lis3dhConfig(ODR_400HZ,SCALE_2G);
-  Lis3dhThs(0x02);
+  Lis3dhThs(0x05);
   
   
   

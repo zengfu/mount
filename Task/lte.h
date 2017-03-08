@@ -6,9 +6,7 @@
 
 
 void LteTask();
-uint8_t SocketWriteBin(uint8_t *data,uint8_t data_len);
-uint8_t SocketWrite(uint8_t *data);
-uint8_t* SocketRead();
+
 
 #define BUF_SIZE 200
 
@@ -19,6 +17,21 @@ uint8_t* SocketRead();
 #define SCM360_NOTIFY_AWAKEN 0x0014
 #define SCM360_NOTIFY_AWAKEN_ACK 0x0015
 
+
+#define AWAKE_STATE_DOING 1
+#define AWAKE_STATE_SUCCESS 2
+#define AWAKE_STATE_FAIL 3
+
+#define RES_STATE_OK 0
+
+
+#define LTE_ERROR 0x00
+#define LTE_LOGIN 0X01
+#define LTE_HEART 0X02
+#define LTE_WAKEUP 0X04
+
+
+
 typedef struct
 {
   uint8_t init;
@@ -27,6 +40,7 @@ typedef struct
   uint8_t conn;
   uint8_t login;
   uint8_t rx_buf[BUF_SIZE];
+  uint8_t length;
 }lte_status_s;
 
 
@@ -34,8 +48,10 @@ typedef struct
 {
   int16_t size;
   int16_t cmd;
-}ScmCommHead;
+  uint8_t* data;
+}FrameTypeDef;
 
+uint8_t CheckFrame();
 
 
 

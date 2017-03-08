@@ -1262,6 +1262,12 @@
         <name>$PROJ_DIR$\..\Drivers\STM32L0xx_HAL_Driver\Src\stm32l0xx_hal_rcc_ex.c</name>
       </file>
       <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32L0xx_HAL_Driver\Src\stm32l0xx_hal_rtc.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32L0xx_HAL_Driver\Src\stm32l0xx_hal_rtc_ex.c</name>
+      </file>
+      <file>
         <name>$PROJ_DIR$\..\Drivers\STM32L0xx_HAL_Driver\Src\stm32l0xx_hal_spi.c</name>
       </file>
       <file>
@@ -1325,6 +1331,18 @@
   </group>
   <group>
     <name>Protocol</name>
+    <file>
+      <name>$PROJ_DIR$\..\Protocol\fhex.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Protocol\fhex.h</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Protocol\socket.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Protocol\socket.h</name>
+    </file>
   </group>
   <group>
     <name>Task</name>
@@ -1339,6 +1357,21 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\Task\lte.h</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Task\s2l.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Task\s2l.h</name>
+    </file>
+  </group>
+  <group>
+    <name>Tools</name>
+    <file>
+      <name>$PROJ_DIR$\..\Tools\base64.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Tools\base64.h</name>
     </file>
   </group>
 </project>

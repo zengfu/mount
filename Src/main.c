@@ -42,8 +42,10 @@
 #include "event.h"
 #include "lis3dx.h"
 #include "lte.h"
+#include "s2l.h"
 #include "cJSON.h"
 #include "stdlib.h"
+#include "fhex.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -55,13 +57,20 @@ COMP_HandleTypeDef hcomp2;
 UART_HandleTypeDef hlpuart1;
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_lpuart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
+
+RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
 
 osThreadId defaultTaskHandle;
 osThreadId eventhandleHandle;
 osThreadId lteHandle;
+osThreadId s2lhanldeHandle;
 osMessageQId EventQHandle;
+osMessageQId UartQHandle;
+osMutexId EventLockHandle;
+osSemaphoreId Uart1LockHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
@@ -79,9 +88,11 @@ static void MX_COMP2_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_RTC_Init(void);
 void StartDefaultTask(void const * argument);
 void Event_Task(void const * argument);
 void Lte_Task(void const * argument);
+void S2L_Task(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -127,14 +138,25 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
+  MX_RTC_Init();
 
   /* USER CODE BEGIN 2 */
   //test();
   /* USER CODE END 2 */
 
+  /* Create the mutex(es) */
+  /* definition and creation of EventLock */
+  osMutexDef(EventLock);
+  EventLockHandle = osMutexCreate(osMutex(EventLock));
+
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* definition and creation of Uart1Lock */
+  osSemaphoreDef(Uart1Lock);
+  Uart1LockHandle = osSemaphoreCreate(osSemaphore(Uart1Lock), 1);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -154,8 +176,12 @@ int main(void)
   eventhandleHandle = osThreadCreate(osThread(eventhandle), NULL);
 
   /* definition and creation of lte */
-  osThreadDef(lte, Lte_Task, osPriorityNormal, 0, 128);
+  osThreadDef(lte, Lte_Task, osPriorityNormal, 0, 256);
   lteHandle = osThreadCreate(osThread(lte), NULL);
+
+  /* definition and creation of s2lhanlde */
+  osThreadDef(s2lhanlde, S2L_Task, osPriorityHigh, 0, 128);
+  s2lhanldeHandle = osThreadCreate(osThread(s2lhanlde), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -166,9 +192,15 @@ int main(void)
   osMessageQDef(EventQ, 10, EventTypeDef);
   EventQHandle = osMessageCreate(osMessageQ(EventQ), NULL);
 
+  /* definition and creation of UartQ */
+  osMessageQDef(UartQ, 16, uint8_t);
+  UartQHandle = osMessageCreate(osMessageQ(UartQ), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   //HAL_Delay(20);
+  printf("bsp init\r\n");
+
   BspInit();
   /* USER CODE END RTOS_QUEUES */
  
@@ -204,8 +236,9 @@ void SystemClock_Config(void)
 
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLLMUL_8;
@@ -226,9 +259,11 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_LPUART1;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_LPUART1
+                              |RCC_PERIPHCLK_RTC;
   PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
   PeriphClkInit.Lpuart1ClockSelection = RCC_LPUART1CLKSOURCE_PCLK1;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -293,7 +328,7 @@ static void MX_COMP1_Init(void)
   hcomp1.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp1.Init.Mode = COMP_POWERMODE_ULTRALOWPOWER;
   hcomp1.Init.WindowMode = COMP_WINDOWMODE_DISABLE;
-  hcomp1.Init.TriggerMode = COMP_TRIGGERMODE_NONE;
+  hcomp1.Init.TriggerMode = COMP_TRIGGERMODE_IT_RISING;
   if (HAL_COMP_Init(&hcomp1) != HAL_OK)
   {
     Error_Handler();
@@ -312,7 +347,7 @@ static void MX_COMP2_Init(void)
   hcomp2.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp2.Init.Mode = COMP_POWERMODE_MEDIUMSPEED;
   hcomp2.Init.WindowMode = COMP_WINDOWMODE_DISABLE;
-  hcomp2.Init.TriggerMode = COMP_TRIGGERMODE_NONE;
+  hcomp2.Init.TriggerMode = COMP_TRIGGERMODE_IT_RISING;
   if (HAL_COMP_Init(&hcomp2) != HAL_OK)
   {
     Error_Handler();
@@ -355,6 +390,57 @@ static void MX_USART1_UART_Init(void)
   huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
   if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
+/* RTC init function */
+static void MX_RTC_Init(void)
+{
+
+  RTC_TimeTypeDef sTime;
+  RTC_DateTypeDef sDate;
+
+    /**Initialize RTC and set the Time and Date 
+    */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sTime.Hours = 0x0;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Date = 0x1;
+  sDate.Year = 0x0;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+    /**Enable the WakeUp 
+    */
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 30, RTC_WAKEUPCLOCK_CK_SPRE_16BITS) != HAL_OK)
   {
     Error_Handler();
   }
@@ -509,7 +595,7 @@ void Event_Task(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(1000);
   }
   /* USER CODE END Event_Task */
 }
@@ -525,6 +611,19 @@ void Lte_Task(void const * argument)
     osDelay(1);
   }
   /* USER CODE END Lte_Task */
+}
+
+/* S2L_Task function */
+void S2L_Task(void const * argument)
+{
+  /* USER CODE BEGIN S2L_Task */
+  S2lTask();
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END S2L_Task */
 }
 
 /**

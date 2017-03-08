@@ -37,7 +37,7 @@
 #define LTE_RESET GPIO_PIN_6
 
 #define LTE_WAKEUP_PORT GPIOA
-#define LTE_WAKEUP GPIO_PIN_12
+#define LTE_WAKEUP_PIN GPIO_PIN_12
 //**************
 
 //GPS Enable
