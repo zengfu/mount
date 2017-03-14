@@ -364,7 +364,8 @@ void LteTask()
   while(1)
   {
     //wait the module init
-    
+  at:   
+    LedSet(0,0); 
     while(lte.init==0)
     {
       if(CheckAT())
@@ -375,13 +376,16 @@ void LteTask()
       lte.init=1;
       
     }
-    LedSet(0,0);
+    
     //check the card
     if(CheckCard()==0)
     {
       lte.card=1;
     }
-at:    
+    else
+    {
+      lte.card=0;
+    }
     //close the socket
     SocketClose();
     osDelay(1000);
@@ -392,27 +396,19 @@ at:
     }
     else
     {
+      lte.socket=0;
       goto at;
     }
+    osDelay(1000);
     //connect to server
-    while(lte.conn==0)
+    if(SocketOpen()==0)
+    {            
+      lte.conn=1;        
+    }
+    else
     {
- 
-      if(SocketOpen()==0)
-      {            
-        lte.conn=1;        
-      }
-      else
-      {
-        static uint8_t conn_cnt=0;
-        conn_cnt++;
-        if(conn_cnt==10)
-        {
-          conn_cnt=0;
-          lte.socket=0;
-          goto at;
-        }
-      }
+      lte.conn=0;
+      goto at;
     }
     
     //send token
@@ -423,8 +419,6 @@ at:
       if(SCMLoginDirTest())
       {
         osDelay(1000);
-        lte.socket=0;
-        lte.conn=0;
         goto at;
       }
       login_cnt=0;
@@ -446,8 +440,7 @@ at:
       */
       if(login_cnt==10)
       {
-        lte.socket=0;
-        lte.conn=0;
+        lte.login=0;
         goto at;
       }
       else
@@ -461,8 +454,6 @@ at:
       if( SendHeart())
       {
         osDelay(1000);
-        lte.socket=0;
-        lte.conn=0;
         lte.login=0;
         goto at;
       }
@@ -496,8 +487,6 @@ at:
       */
       if(heart_cnt==5)
       {
-        lte.socket=0;
-        lte.conn=0;
         lte.login=0;
         goto at;
       }

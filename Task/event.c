@@ -89,10 +89,10 @@ void LteEventHandle(EventTypeDef *event)
   {
     LedTog(2);
     uint8_t state=0;
-    HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
+    //HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
     state=CheckFrame();
-    osDelay(5000);
-    HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
+    //osDelay(5000);
+    //HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
     if((state&LTE_WAKEUP))
     {
       //wake up thing
@@ -194,9 +194,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     tmpevt.evt=EvtLte;
     tmpevt.tick=HAL_GetTick();
     LedTog(1);
-    if(HAL_GPIO_ReadPin(LTE_IT,GPIO_Pin))
+    if(!HAL_GPIO_ReadPin(LTE_IT,GPIO_Pin))
     {
-      tmpevt.io=GPIO_PIN_SET;
+      tmpevt.io=GPIO_PIN_RESET;
     //osMessagePut(dangerHandle,*(uint32_t *)&tmpevt,0);
       xQueueSendFromISR(EventQHandle,&tmpevt,0);
     }
