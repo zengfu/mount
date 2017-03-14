@@ -2,6 +2,7 @@
 #include "cmsis_os.h"
 #include "s2l.h"
 #include "string.h"
+#include "lis3dx.h"
 
 #define flash_begin 0x080000c0 
 
@@ -9,9 +10,11 @@ extern DMA_HandleTypeDef hdma_usart1_tx;
 extern UART_HandleTypeDef huart1;
 extern osSemaphoreId Uart1LockHandle;
 extern osMutexId EventLockHandle;
-
+extern Lis3dxTypeDef Lis3dx;
 
 static uint8_t* TxP;
+
+uint8_t* LoginHead=NULL;
 
 static void CmdSend(uint8_t* data,uint8_t length);
 static void DumpFrame(uint8_t* data,uint16_t id,uint8_t length);
@@ -34,6 +37,11 @@ void ReadEvent(uint8_t* data);
 #define SetResetId   0x0004
 #define SetLoginId   0x0010
 #define ReadEventId  0x0020
+#define LogInfoId    0x0030
+
+#define AckFrame     0xEEFF
+#define NackFrame    0xFFEE
+#define InfoFrame    0xFFFF
 
 const FuncTypeDef S2lFunc[]={
   {GetVersionId,GetVersion},
@@ -66,25 +74,69 @@ void GetVersion(uint8_t* data)
 }
 void SetAccel(uint8_t* data)
 {
+  Lis3dx.upload=data[8];
+  Lis3dx.odr=data[9]<<4;
+  Lis3dx.scale=data[10]<<4;
+  Lis3dx.ths=data[11];
+  
+  Lis3dhThs(Lis3dx.ths);
+  Lis3dhConfig(Lis3dx.odr,Lis3dx.scale);
   
 }
 void GetAccel(uint8_t* data)
 {
+  uint8_t buf[4];
+  
+  buf[0]=Lis3dx.upload;
+  buf[1]=(Lis3dx.odr>>4);
+  buf[2]=(Lis3dx.scale>>4);
+  buf[3]=Lis3dx.ths;
+  
+  DumpFrame(buf,GetAccelId,4);
   
 }
 void ReadAccel(uint8_t* data)
 {
-  
+  uint8_t raw[6];
+  accel_raw_read(raw);
+  DumpFrame(raw,ReadAccelId,6);
 }
 void SetReset(uint8_t* data)
 {
-  
+  uint8_t err=0;
+  DumpFrame((uint8_t*)&err,InfoFrame,1);
+  HAL_Delay(10);
+  vPortEnterCritical();
+  HAL_NVIC_SystemReset();
+  //never return 
 }
+
+
+
+
 void SetLogin(uint8_t* data)
 {
+//  uint16_t length;
+//  length=data[2]<<8|data[3];
+//  DumpFrame(data+8,SetLoginId,length-4);
+  uint8_t err=0;
   uint16_t length;
   length=data[2]<<8|data[3];
-  DumpFrame(data+8,SetLoginId,length-4);
+  if(LoginHead)
+  {
+    vPortFree(LoginHead);
+  }
+  LoginHead=pvPortMalloc(length-2);
+  //
+  vPortEnterCritical();
+  LoginHead[0]=data[2];
+  LoginHead[1]=data[3];
+  memcpy(LoginHead+2,data+8,length-4);
+  vPortExitCritical();
+  
+  DumpFrame((uint8_t*)&err,InfoFrame,1);
+  //LoginHead
+  
 }
 void ReadEvent(uint8_t* data)
 {
@@ -117,7 +169,10 @@ void SendAck()
   DumpFrame(NULL,0xeeff,0);
  
 }
-
+void S2L_LOG(uint8_t* log)
+{
+  DumpFrame(log,LogInfoId,strlen(log)+1);
+}
 static void DumpFrame(uint8_t* data,uint16_t id,uint8_t length)
 {
   //no data

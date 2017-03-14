@@ -7,6 +7,7 @@
 #include "socket.h"
 #include "event.h"
 
+extern uint8_t* LoginHead;
 
 lte_status_s lte;
 FrameTypeDef GlobalFrame[3];//max=3
@@ -41,12 +42,83 @@ static uint8_t SCMWakeup(uint8_t status)
   }
   if((err=SocketWrite(frame.data))!=0)
   {
+#ifdef S2L_DEBUG
+    S2L_LOG(frame.data);
+#else
     printf("%s\n",frame.data);
+#endif
     vPortFree(frame.data);
     return 1;
   }
   vPortFree(frame.data);
   return 0;
+}
+uint8_t const token[]={0x0A,0x74,0xFE,0x3E,0x63,0x26,0xE5,\
+  0x56,0xA8,0x92,0x4D,0xA6,0xA1,0xBE,0x62,0x41,\
+    0x9C,0xE4,0x7B,0x91,0x68,0xB6,0xDC,0x3C,0x80,0x4F,\
+      0x39,0xBC,0x0F,0xBC,0x73,0x16,0x13,0x74,0xAF,0x8B,0x63,\
+        0xD0,0xC1,0x0B,0x72,0xD2,0x92,0x4B,0x0F,\
+          0x41,0xF8,0x76,0xE7,0xF8,0x7C,0xD9,0x2E,0x1E,0x2C,\
+            0x9D,0xA7,0x3C,0x20,0xE7,0x50,0x11,0xD8,0xAB,0x4F,\
+              0x14,0xA0,0x3A,0x38,0xF8,0xFF,0x5E,0xC2,0xFC,0x55,0xFF,0x59,\
+                0x22,0x6C,0xD3,0x4F,0x14,0x24,0xF3,0xEF,0x2F,0xFC,0x9B,\
+                  0xE9,0x6E,0x60,0x89,0x64,0xCE,0xCE,0x8D,0x2B};
+uint8_t SCMLoginDirTest()
+{ 
+  uint16_t length;
+  uint8_t err;
+  FrameTypeDef frame;
+  
+  length=0x65;
+  frame.cmd=SCM360_LOGIN_REQ;
+  frame.size=length;//length-4+4
+  frame.data=LoginHead+2;
+  
+  uint8_t tmp[4];
+  tmp[0]=((uint8_t*)&frame)[1];
+  tmp[1]=((uint8_t*)&frame)[0];
+  tmp[2]=((uint8_t*)&frame)[3];
+  tmp[3]=((uint8_t*)&frame)[2];
+  if((err=SocketWriteBin(tmp,4)!=0))
+  {
+     return 1;
+  }
+  if((err=SocketWriteBin((uint8_t*)token,length-4)!=0))
+  {
+     return 1;
+  }
+  return 0;
+  
+}
+uint8_t SCMLoginDir()
+{
+  if(LoginHead==NULL)
+    return 1;
+  
+  uint16_t length;
+  uint8_t err;
+  FrameTypeDef frame;
+  
+  length=LoginHead[0]<<8|LoginHead[1];
+  frame.cmd=SCM360_LOGIN_REQ;
+  frame.size=length;//length-4+4
+  frame.data=LoginHead+2;
+  
+  uint8_t tmp[4];
+  tmp[0]=((uint8_t*)&frame)[1];
+  tmp[1]=((uint8_t*)&frame)[0];
+  tmp[2]=((uint8_t*)&frame)[3];
+  tmp[3]=((uint8_t*)&frame)[2];
+  if((err=SocketWriteBin(tmp,4)!=0))
+  {
+     return 1;
+  }
+  if((err=SocketWriteBin(frame.data,length-4)!=0))
+  {
+     return 1;
+  }
+  return 0;
+  
 }
 static uint8_t SCMLogin(uint8_t* device_id,uint8_t* user_id,uint8_t* token)
 {
@@ -62,8 +134,11 @@ static uint8_t SCMLogin(uint8_t* device_id,uint8_t* user_id,uint8_t* token)
   char* out=cJSON_PrintUnformatted(root);
   cJSON_Delete(root);
   //char* encode;
+#ifdef S2L_DEBUG
+  S2L_LOG(out);
+#else
   printf("%s\n",out);
-  
+#endif 
   //base 64 encode
   frame.data=b64_encode(out);
   vPortFree(out);
@@ -83,13 +158,18 @@ static uint8_t SCMLogin(uint8_t* device_id,uint8_t* user_id,uint8_t* token)
   }
   if((err=SocketWrite(frame.data))!=0)
   {
+#ifdef S2L_DEBUG
+    S2L_LOG(frame.data);
+#else
     printf("%s\n",frame.data);
+#endif
     vPortFree(frame.data);
     return 1;
   }
   vPortFree(frame.data);
   return 0;
 }
+
 static uint8_t S2N(uint8_t* str)
 {
   uint8_t tmp[2]={0};
@@ -119,15 +199,16 @@ uint8_t SendHeart()
      return 1;
   return 0;
 }
-uint8_t read_len;
-uint8_t *rdata;
+
+
 uint8_t ReadFrame(FrameTypeDef* frame,uint8_t *num)
 {
-  
+  uint8_t *rdata;
+  uint16_t read_len;
   rdata=SocketRead();
   if(rdata==NULL)
   {
-    printf("error1");
+    //printf("error1");
     return 1;
   }
   else
@@ -137,7 +218,7 @@ uint8_t ReadFrame(FrameTypeDef* frame,uint8_t *num)
     *num=0;
     return 1;
   }
-  uint8_t cnt_len=0;
+  uint16_t cnt_len=0;
   uint8_t buf[4];
   
   for((*num)=0;(*num)<3;(*num)++)
@@ -152,8 +233,9 @@ uint8_t ReadFrame(FrameTypeDef* frame,uint8_t *num)
     frame[*num].data=rdata+8+cnt_len;
     if(!(frame[*num].cmd>=SCM360_LOGIN_REQ&&frame[*num].cmd<=SCM360_NOTIFY_AWAKEN_ACK))
     {
-       printf("error");
-       while(1);
+      return 1;
+//       printf("error");
+//       while(1);
     }
     cnt_len+=((frame[*num].size-4)*2+8);
     if(read_len==cnt_len)      
@@ -179,7 +261,11 @@ uint8_t HeartAck(FrameTypeDef* frame)
   //uint8_t data*=pvPortMalloc(frame->size-4+1);
   if(frame->size!=4)
     return 1;
+#ifdef S2L_DEBUG
+  S2L_LOG("HeartAck\r\n");
+#else
   printf("HeartAck\r\n");
+#endif
   return 0;
 }
 uint8_t LoginAck(FrameTypeDef* frame)
@@ -202,7 +288,11 @@ uint8_t LoginAck(FrameTypeDef* frame)
   vPortFree(num);
   if(json==NULL)
     return 1;
+#ifdef S2L_DEBUG
+  S2L_LOG(json);
+#else
   printf("%s\n",json);
+#endif
   root=cJSON_Parse(json);
   vPortFree(json);
   res=cJSON_GetObjectItem(root,"res")->valueint;
@@ -214,7 +304,11 @@ uint8_t LoginAck(FrameTypeDef* frame)
   else
   {
     uint8_t* err=cJSON_GetObjectItem(root,"err_msg")->string;
+#ifdef S2L_DEBUG
+    S2L_LOG(err);
+#else
     printf("error:%s\n",err);
+#endif
     cJSON_Delete(root);
     return 1;
   }
@@ -225,8 +319,9 @@ uint8_t CheckFrame()
 {
   uint8_t num,status;
   status=0;
-  memset(GlobalFrame,0,sizeof(GlobalFrame[1])*3);
-  ReadFrame(GlobalFrame,&num);
+  memset(GlobalFrame,0,sizeof(GlobalFrame));
+  if(ReadFrame(GlobalFrame,&num))
+    return 0;
   for(int i=0;i<num;i++)
   {
     switch(GlobalFrame[i].cmd)
@@ -252,7 +347,7 @@ uint8_t CheckFrame()
         break;
       }
     default:
-      return 1;
+      return 0;
     }
   }
   return status; 
@@ -265,31 +360,39 @@ void LteTask()
 {
   uint8_t login_cnt,heart_cnt;
   memset(&lte,0,sizeof(lte));//reset the space
-  HAL_UART_Receive_DMA(&LTE_UART,lte.rx_buf,BUF_SIZE);//open receive hardware
+  //HAL_UART_Receive_DMA(&LTE_UART,lte.rx_buf,BUF_SIZE);//open receive hardware
   while(1)
   {
     //wait the module init
+    
     while(lte.init==0)
     {
-      CheckAT();
-      osDelay(500);
+      if(CheckAT())
+      {
+        osDelay(1000);
+        LedTog(0);
+      }
+      lte.init=1;
+      
     }
+    LedSet(0,0);
     //check the card
-    while(lte.card==0)
+    if(CheckCard()==0)
     {
-      CheckCard();
-      osDelay(500);
+      lte.card=1;
     }
+at:    
     //close the socket
     SocketClose();
-    //init the socekt
-    while(lte.socket==0)
+    osDelay(1000);
+    //init the socekt    
+    if(SocketInit()==0)
     {
-      if(SocketInit()==0)
-      {
-            lte.socket=1;
-          
-      }
+      lte.socket=1;  
+    }
+    else
+    {
+      goto at;
     }
     //connect to server
     while(lte.conn==0)
@@ -306,10 +409,8 @@ void LteTask()
         if(conn_cnt==10)
         {
           conn_cnt=0;
-          lte.card=0;
-          lte.init=0;
           lte.socket=0;
-          break;
+          goto at;
         }
       }
     }
@@ -318,13 +419,23 @@ void LteTask()
     uint8_t LteStatus=0;
     while(lte.login==0)
     {
-      if(SCMLogin("dcamera_1","fe19518498fe40aba34c63658b8e9eac","2213ffdaer1123"))
-        break;
+      //if(SCMLogin("dcamera_1","fe19518498fe40aba34c63658b8e9eac","2213ffdaer1123"))
+      if(SCMLoginDirTest())
+      {
+        osDelay(1000);
+        lte.socket=0;
+        lte.conn=0;
+        goto at;
+      }
       login_cnt=0;
       //LteStatus=CheckFrame();
-      while((!(CheckFrame() & LTE_LOGIN))&&(login_cnt<5))//read 5 times
+      while((!(CheckFrame() & LTE_LOGIN))&&(login_cnt<10))//read 5 times
       {
+#ifdef S2L_DEBUG
+        S2L_LOG("login_re\r\n");
+#else
         printf("login_re:%d\r\n",login_cnt);
+#endif
         //SCMLogin("test1","test2","2213ffdaer1123");
         login_cnt++;
         osDelay(1000);
@@ -333,11 +444,11 @@ void LteTask()
         failed
         fresh socket,connect
       */
-      if(login_cnt==5)
+      if(login_cnt==10)
       {
         lte.socket=0;
         lte.conn=0;
-        break;
+        goto at;
       }
       else
       {
@@ -346,21 +457,36 @@ void LteTask()
     }
     while(lte.login)
     {
-      
-      SendHeart();
+      LedSet(0,1);
+      if( SendHeart())
+      {
+        osDelay(1000);
+        lte.socket=0;
+        lte.conn=0;
+        lte.login=0;
+        goto at;
+      }
       heart_cnt=0;
       do
       {
         LteStatus=CheckFrame();
         if(LteStatus & LTE_WAKEUP)
         {
+#ifdef S2L_DEBUG
+          S2L_LOG("wakeup_in_lte\r\n");
+#else
           printf("wakeup_in_lte\r\n");
+#endif
         }
         if(LteStatus & LTE_HEART)
         {
           break;
         }
+#ifdef S2L_DEBUG
+        S2L_LOG("heart_re\r\n");
+#else 
         printf("heart_re:%d\r\n",heart_cnt);
+#endif
         heart_cnt++;
       }
       while(heart_cnt<5);
@@ -373,7 +499,7 @@ void LteTask()
         lte.socket=0;
         lte.conn=0;
         lte.login=0;
-        break;
+        goto at;
       }
       /*ack failed 
       /reinit socket and conn*/

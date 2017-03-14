@@ -7,6 +7,7 @@ uint8_t Lis3dxInit();
 
 typedef struct
 {
+  uint8_t upload;
   uint8_t odr;    //output data rate
   uint8_t scale;  // +-2 +-3 +-8 +-16
   uint8_t ths;     // lsb 16 32 63 125
@@ -54,6 +55,7 @@ typedef struct
 void Lis3dhThs(uint8_t level);
 void Lis3dhConfig(uint8_t odr,uint8_t scale);
 void accel_read(int16_t* accel);
+void accel_raw_read(uint8_t* raw);
 uint8_t ReadIntCnt();
 
 #endif

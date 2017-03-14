@@ -100,18 +100,7 @@ void S2L_Task(void const * argument);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-void test()
-{
-  cJSON *root;
-  char*out;
-  root=cJSON_CreateObject();	
-  cJSON_AddItemToObject(root, "name", cJSON_CreateString("Jack (\"Bee\") Nimble"));
-  cJSON_AddItemToObject(root, "test", cJSON_CreateString("haha"));
-  out=cJSON_Print(root);
-  cJSON_Delete(root);
-  printf("%s\n",out);
-  vPortFree(out);
-}
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -199,7 +188,11 @@ int main(void)
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   //HAL_Delay(20);
+#ifdef S2L_DEBUG
+  S2L_LOG("bsp init\r\n");
+#else
   printf("bsp init\r\n");
+#endif
 
   BspInit();
   /* USER CODE END RTOS_QUEUES */
@@ -440,7 +433,7 @@ static void MX_RTC_Init(void)
 
     /**Enable the WakeUp 
     */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 30, RTC_WAKEUPCLOCK_CK_SPRE_16BITS) != HAL_OK)
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc,600, RTC_WAKEUPCLOCK_CK_SPRE_16BITS) != HAL_OK)
   {
     Error_Handler();
   }
@@ -608,7 +601,7 @@ void Lte_Task(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(1000);
   }
   /* USER CODE END Lte_Task */
 }

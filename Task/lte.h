@@ -8,7 +8,7 @@
 void LteTask();
 
 
-#define BUF_SIZE 200
+#define BUF_SIZE 300
 
 #define SCM360_LOGIN_REQ 0X0010
 #define SCM360_LOGIN_ACK 0x0011
@@ -40,7 +40,7 @@ typedef struct
   uint8_t conn;
   uint8_t login;
   uint8_t rx_buf[BUF_SIZE];
-  uint8_t length;
+  uint16_t length;
 }lte_status_s;
 
 

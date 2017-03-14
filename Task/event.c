@@ -72,7 +72,7 @@ void MicroWaveEventHandle(EventTypeDef *event)
   {
     RealeaseTime=event->tick;
     LedSet(0,0);
-    printf("wm:%d\r\n",(RealeaseTime-PressTime));
+    //printf("wm:%d\r\n",(RealeaseTime-PressTime));
   }
 }
 void PirEventHandle(EventTypeDef *event)
@@ -87,13 +87,21 @@ void LteEventHandle(EventTypeDef *event)
   
   if(osThreadIsSuspended(lteHandle)==osOK)
   {
-    uint8_t state;
+    LedTog(2);
+    uint8_t state=0;
+    HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
     state=CheckFrame();
+    osDelay(5000);
+    HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
     if((state&LTE_WAKEUP))
     {
       //wake up thing
       LedSet(2,1);
+#ifdef S2L_DEBUG
+      S2L_LOG("wakeup\r\n");
+#else
       printf("wakeup\r\n");
+#endif
       osDelay(100);
       LedSet(2,0);
       //todo:
@@ -185,9 +193,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     EventTypeDef tmpevt;
     tmpevt.evt=EvtLte;
     tmpevt.tick=HAL_GetTick();
-    tmpevt.io=HAL_GPIO_ReadPin(LTE_IT,GPIO_Pin);
+    LedTog(1);
+    if(HAL_GPIO_ReadPin(LTE_IT,GPIO_Pin))
+    {
+      tmpevt.io=GPIO_PIN_SET;
     //osMessagePut(dangerHandle,*(uint32_t *)&tmpevt,0);
-    xQueueSendFromISR(EventQHandle,&tmpevt,0);
+      xQueueSendFromISR(EventQHandle,&tmpevt,0);
+    }
   }
   if(GPIO_Pin==GPIO_PIN_9)
   {

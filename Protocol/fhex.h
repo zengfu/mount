@@ -12,7 +12,7 @@ typedef struct
 
 void SendAck();
 void ExecCmd(uint16_t id,uint8_t* pdata);
-
+void S2L_LOG(uint8_t* log);
 
 
 #endif

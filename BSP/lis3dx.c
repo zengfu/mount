@@ -59,9 +59,10 @@ uint8_t Lis3dxInit()
   err=who_am_i();
   if(err)
     return 1;
-//  Lis3dx.odr=ODR_50HZ;
-//  Lis3dx.scale=SCALE_2G;
-//  Lis3dx.ths=0x05;
+  Lis3dx.odr=ODR_50HZ;
+  Lis3dx.scale=SCALE_2G;
+  Lis3dx.upload=0;
+  Lis3dx.ths=0x05;
   Lis3dhConfig(ODR_400HZ,SCALE_2G);
   Lis3dhThs(0x05);
   
@@ -119,7 +120,10 @@ void accel_read(int16_t* accel)
   accel[2]=(buffer[5]<<8)|buffer[4];
 }
 
-
+void accel_raw_read(uint8_t* raw)
+{
+  spi_read(OUT_X_L,raw,6,1);
+}
 
 static uint8_t who_am_i()
 {
